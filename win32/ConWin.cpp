@@ -74,7 +74,8 @@ bool ConWindow::startup()
     return false;
 
   scrBuf = CreateConsoleScreenBuffer(GENERIC_READ|GENERIC_WRITE,
-                                     0, NULL, // No sharing
+                                     FILE_SHARE_READ|FILE_SHARE_WRITE, // the buffer must be shared to work with console wrappers
+                                     NULL,
                                      CONSOLE_TEXTMODE_BUFFER, NULL);
 
   if (scrBuf == INVALID_HANDLE_VALUE)
