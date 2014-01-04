@@ -56,6 +56,7 @@ class ConWindow
  public:
   static HANDLE inBuf;
   static HANDLE scrBuf;
+  static UINT   cp;
 
  protected:
   COORD  size;

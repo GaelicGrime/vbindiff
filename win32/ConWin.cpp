@@ -53,6 +53,7 @@ static const WORD colorStyle[] = {
 //--------------------------------------------------------------------
 HANDLE  ConWindow::inBuf  = INVALID_HANDLE_VALUE;
 HANDLE  ConWindow::scrBuf = INVALID_HANDLE_VALUE;
+UINT    ConWindow::cp     = ::GetConsoleOutputCP();
 
 static DWORD  origInMode = 0;    // The original input mode
 
@@ -89,6 +90,10 @@ bool ConWindow::startup()
     return false;
   }
 
+  // change the codepage to 850
+  // this fixes box drawing in other code pages
+  ::SetConsoleOutputCP(850);
+
   return true;
 } // end ConWindow::startup
 
@@ -104,6 +109,8 @@ void ConWindow::shutdown()
   if (scrBuf != INVALID_HANDLE_VALUE)
     CloseHandle(scrBuf);
   scrBuf = INVALID_HANDLE_VALUE;
+
+  ::SetConsoleOutputCP(ConWindow::cp);
 } // end ConWindow::shutdown
 
 //--------------------------------------------------------------------
