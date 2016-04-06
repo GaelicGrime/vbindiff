@@ -17,7 +17,7 @@ This repository uses a submodule to pull in my [Free GetOpt](https://github.com/
 2. Run `git submodule update --init`
 3. If you're working on a Unix system, run `autoreconf -i`
 
-Now you're ready to use the normal `./configure && make` process on Unix, or open `win32/vbindiff.dsw` on Windows.
+Now you're ready to use the normal `./configure && make` process on Unix, or open `win32/vbindiff.sln` on Windows.
 
 To build the documentation, you'll also need [Perl](http://www.perl.org/), [Date::Format](https://metacpan.org/module/Date::Format), and [Template-Toolkit](https://metacpan.org/release/Template-Toolkit).  For Windows, I recommend [Strawberry Perl](http://strawberryperl.com/), which comes with the necessary modules.  On Unix, your distro may have packages, or you can install from [CPAN](http://www.cpan.org/).  Package names for some distros are:
 
