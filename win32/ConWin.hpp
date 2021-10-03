@@ -48,7 +48,8 @@ enum Style {
   cFileName,
   cFileWin,
   cFileDiff,
-  cFileEdit
+  cFileEdit,
+  cFileSearch
 };
 
 class ConWindow
@@ -81,12 +82,12 @@ class ConWindow
   void resize(short width, short height);
   void setAttribs(Style color);
   void setCursor(short x, short y);
-  void update(unsigned short margin=0);
+  void update(short margin=0);
 
   void hide() {};
   void show() {};
 
-  static void getScreenSize(int& x, int& y);
+  static void getScreenSize(short& x, short& y);
   static void hideCursor();
   static void readKey(KEY_EVENT_RECORD& event);
   static void showCursor(bool insert=true);

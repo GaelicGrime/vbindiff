@@ -21,6 +21,8 @@
 
 #include "config.h"
 
+#pragma warning(push)
+#pragma warning(disable:4365)
 #include <ctype.h>
 #include <limits.h>
 #include <stdlib.h>
@@ -32,6 +34,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#pragma warning(pop)
 using namespace std;
 
 #include "GetOpt/GetOpt.hpp"
@@ -102,7 +105,7 @@ const Command  cmgGoto        = 0x04; // Commands 4-7
 const Command  cmgGotoTop     = 0x01;
 const Command  cmgGotoBottom  = 0x02;
 const Command  cmgGotoBoth    = cmgGotoTop|cmgGotoBottom;
-const Command  cmgGotoMask    = ~cmgGotoBoth;
+const Command  cmgGotoMask    = static_cast<Command>(~cmgGotoBoth);
 
 const Command  cmfFind        = 0x40; // Commands 64-67
 const Command  cmfFindNext    = 0x10;
@@ -121,23 +124,23 @@ const short  leftMar  = 13;     // Starting column of hex display
 
 #ifdef WIDTH24
 // display 3 x 8 Byte
-const int    lineWidth = 24;
-const int  screenWidth = 114;
-const short   leftMar2 = 88;
+const short   lineWidth = 24;
+const short screenWidth = 114;
+const short    leftMar2 = 88;
 #elif WIDTH32
 // display 4 x 8 Byte
-const int    lineWidth = 32;
-const int  screenWidth = 148;
-const short   leftMar2 = 113;
+const short   lineWidth = 32;
+const short screenWidth = 148;
+const short    leftMar2 = 113;
 #else
 // display 2 x 8 Byte
-const int    lineWidth = 16;    // Number of bytes displayed per line
-const int  screenWidth = 80;    // Key value - but _must_ be constant!
-const short   leftMar2 = 63;    // Starting column of ASCII display
+const short   lineWidth = 16;    // Number of bytes displayed per line
+const short screenWidth = 80;    // Key value - but _must_ be constant!
+const short    leftMar2 = 63;    // Starting column of ASCII display
 #endif
 
-const int  promptHeight = 4;    // Height of prompt window
-const int  inWidth = 10;        // Width of input window (excluding border)
+const short promptHeight = 4;    // Height of prompt window
+const short inWidth = 10;        // Width of input window (excluding border)
 
 const int  maxPath = 260;
 
@@ -166,7 +169,7 @@ class FileDisplay
   friend class Difference;
 
  protected:
-  int                bufContents;
+  Size               bufContents;
   FileBuffer*        data;
   const Difference*  diffs;
   File               file;
@@ -174,21 +177,21 @@ class FileDisplay
   FPos               offset;
   ConWindow          win;
   bool               writable;
-  int                yPos;
-  int                search;
+  short              yPos;
+  size_t             search;
  public:
   FileDisplay();
   ~FileDisplay();
-  void         init(int y, const Difference* aDiff);
+  void         init(short y, const Difference* aDiff);
   void         resize();
   void         shutDown();
   void         display();
   bool         edit(const FileDisplay* other);
   const Byte*  getBuffer() const { return data->buffer; };
-  void         move(int step)    { moveTo(offset + step); };
+  void         move(FPos step)    { moveTo(offset + step); };
   void         moveTo(FPos newOffset);
-  bool         moveTo(const Byte* searchFor, int searchLen);
-  bool         moveToBack(const Byte* searchFor, int searchLen);
+  bool         moveTo(const Byte* searchFor, size_t searchLen);
+  bool         moveToBack(const Byte* searchFor, size_t searchLen);
   void         moveToEnd(FileDisplay* other);
   bool         setFile(const char* aFileName);
   FPos         filesize;
@@ -221,22 +224,24 @@ class InputManager
   StrVec&      history;         // The history vector to use
   StrMap       historyOverlay;  // Overlay of modified history entries
   VecSize      historyPos;      // The current offset into history[]
-  int          maxLen;          // The size of buf (not including NUL)
-  int          len;             // The current length of the string
-  int          i;               // The current cursor position
+  size_t       maxLen;          // The size of buf (not including NUL)
+  size_t       len;             // The current length of the string
+  size_t       i;               // The current cursor position
   bool         upcase;          // Force all characters to uppercase?
   bool         splitHex;        // Entering space-separated hex bytes?
   bool         insert;          // False for overstrike mode
 
+  InputManager& operator = (const InputManager& t) = delete;
+
  public:
-  InputManager(char* aBuf, int aMaxLen, StrVec& aHistory);
+  InputManager(char* aBuf, size_t aMaxLen, StrVec& aHistory);
   bool run();
   void setCharacters(const char* aRestriction) { restrict = aRestriction; };
   void setSplitHex(bool val) { splitHex = val; };
   void setUpcase(bool val)   { upcase = val; };
 
  private:
-  bool normalize(int pos);
+  bool normalize(size_t pos);
   void useHistory(int delta);
 }; // end InputManager
 
@@ -253,13 +258,13 @@ const char*  program_name; // Name under which this program was invoked
 LockState    lockState = lockNeither;
 bool         singleFile = false;
 
-int  numLines  = 9;       // Number of lines of each file to display
-int  bufSize   = numLines * lineWidth;
-int  linesBetween = 1;    // Number of lines of padding between files
+short numLines  = 9;       // Number of lines of each file to display
+Size  bufSize   = static_cast<Size>(numLines * lineWidth);
+short linesBetween = 1;    // Number of lines of padding between files
 
 // The number of bytes to move for each possible step size:
 //   See cmmMoveByte, cmmMoveLine, cmmMovePage
-int  steps[4] = {1, lineWidth, bufSize-lineWidth, 0};
+Size  steps[4] = {1, lineWidth, bufSize-lineWidth, 0};
 
 
 //====================================================================
@@ -270,7 +275,7 @@ int  steps[4] = {1, lineWidth, bufSize-lineWidth, 0};
 #ifdef WIN32_CONSOLE // beep() is defined by ncurses
 void beep()
 {
-  MessageBeep(-1);
+  MessageBeep(0xFFFFFFFFUL);
 } // end beep
 #endif // WIN32_CONSOLE
 
@@ -342,9 +347,9 @@ int Difference::compute()
   const Byte*  buf1 = file1->data->buffer;
   const Byte*  buf2 = file2->data->buffer;
 
-  int  size = min(file1->bufContents, file2->bufContents);
+  Size size = min(file1->bufContents, file2->bufContents);
 
-  int  i;
+  Size i;
   for (i = 0; i < size; i++)
     if (*(buf1++) != *(buf2++)) {
       data->buffer[i] = true;
@@ -424,7 +429,7 @@ FileDisplay::FileDisplay()
 //   y:          The vertical position of the display window
 //   aDiff:      The Difference object related to this buffer
 
-void FileDisplay::init(int y, const Difference* aDiff)
+void FileDisplay::init(short y, const Difference* aDiff)
 {
   diffs = aDiff;
   yPos  = y;
@@ -478,23 +483,33 @@ void FileDisplay::display()
   char bufAsc[lineWidth + lineWidth / 8] = { 0 };
 
   for (row=0; row < numLines; ++row) {
-    memset(bufHex, ' ', sizeof(bufHex) - 1);
     memset(bufAsc, ' ', sizeof(bufAsc) - 1);
 
-    char *pbufHex = bufHex, *pZero;
-    pbufHex += sprintf(pbufHex, "%01X%04X %04X: ",
-      Word(lineOffset >> 32), Word(lineOffset >> 16), Word(lineOffset & 0xFFFF));
+    size_t bufHexLen = 0;
 
-    lineLength = min(lineWidth, bufContents - row * lineWidth);
+    snprintf(bufHex + bufHexLen, sizeof(bufHex) - bufHexLen,
+             "%01X%04X %04X: ",
+             Word(lineOffset >> 32),
+             Word(lineOffset >> 16),
+             Word(lineOffset & 0xFFFF));
+    bufHexLen += strlen(bufHex + bufHexLen);
+
+    lineLength = static_cast<short>(min(static_cast<Size>(lineWidth), bufContents - static_cast<Size>(row) * static_cast<Size>(lineWidth)));
 
     for (col=0, idx = -1; col < lineLength; ++col) {
-      if (! (col % 8)) { *pbufHex++ = ' '; ++idx; }
+      bool addSpace = false;
+      if (! (col % 8)) { addSpace = true; ++idx; }
 
-      pbufHex += sprintf(pbufHex, "%02X ", data->line[row][col]);
+      snprintf(bufHex + bufHexLen, sizeof(bufHex) - bufHexLen,
+               "%s%02X ",
+               addSpace ? " ": "",
+               data->line[row][col]);
+      bufHexLen += strlen(bufHex + bufHexLen);
 
       bufAsc[idx++] = displayTable[data->line[row][col]];
     }
-    if ((pZero = (char*) memchr(bufHex, 0, sizeof(bufHex) - 1))) *pZero = ' ';
+    memset(bufHex + bufHexLen, ' ', sizeof(bufHex) - bufHexLen);
+    bufHex[sizeof(bufHex) - 1] = 0;
 
     win.put(0,        row + 1, bufHex);
     win.put(leftMar2, row + 1, bufAsc);
@@ -582,9 +597,9 @@ bool FileDisplay::edit(const FileDisplay* other)
      case KEY_UP:   if (--y < 0) y = numLines-1; break;
 
      default: {
-       short newByte = -1;
+       int newByte = -1;
        if ((key == KEY_RETURN) && other &&
-           (other->bufContents > x + y*lineWidth)) {
+           (other->bufContents > static_cast<Size>(x) + static_cast<Size>(y) * static_cast<Size>(lineWidth))) {
          newByte = other->data->line[y][x]; // Copy from other file
          hiNib = ascii; // Always advance cursor to next byte
        } else if (ascii) {
@@ -603,7 +618,7 @@ bool FileDisplay::edit(const FileDisplay* other)
        } // end else hex
        if (newByte >= 0) {
          changed = true;
-         setByte(x,y,newByte);
+         setByte(x,y,static_cast<Byte>(newByte));
        } else
          break;
      } // end default and fall thru
@@ -647,10 +662,10 @@ bool FileDisplay::edit(const FileDisplay* other)
 //--------------------------------------------------------------------
 void FileDisplay::setByte(short x, short y, Byte b)
 {
-  if (x + y*lineWidth >= bufContents) {
-    if (x + y*lineWidth > bufContents) {
-      short y1 = bufContents / lineWidth;
-      short x1 = bufContents % lineWidth;
+  if (static_cast<Size>(x) + static_cast<Size>(y) * static_cast<Size>(lineWidth) >= bufContents) {
+    if (static_cast<Size>(x) + static_cast<Size>(y) * static_cast<Size>(lineWidth) > bufContents) {
+      short y1 = static_cast<short>(bufContents / lineWidth);
+      short x1 = static_cast<short>(bufContents % lineWidth);
       while (y1 <= numLines) {
         while (x1 < lineWidth) {
           if ((x1 == x) && (y1 == y)) goto done;
@@ -663,13 +678,13 @@ void FileDisplay::setByte(short x, short y, Byte b)
     } // end if more than 1 byte past the end
    done:
     ++bufContents;
-    data->line[y][x] = b ^ 1;         // Make sure it's different
+    data->line[y][x] = static_cast<Byte>(b ^ 1);         // Make sure it's different
   } // end if past the end
 
   if (data->line[y][x] != b) {
     data->line[y][x] = b;
     char str[3];
-    sprintf(str, "%02X", b);
+    snprintf(str, sizeof(str), "%02X", b);
     win.setAttribs(cFileEdit);
     win.put(leftMar + 3*x + (x / 8), y+1, str);
     str[0] = displayTable[b];
@@ -733,7 +748,7 @@ void FileDisplay::moveTo(FPos newOffset)
 //   true:   The search was successful
 //   false:  Search unsuccessful, file not moved
 
-bool FileDisplay::moveTo(const Byte* searchFor, int searchLen)
+bool FileDisplay::moveTo(const Byte* searchFor, size_t searchLen)
 {
   if (! fileName[0]) return true; // No file, pretend success
 
@@ -746,8 +761,8 @@ bool FileDisplay::moveTo(const Byte* searchFor, int searchLen)
 
   Size bytesRead = ReadFile(file, searchBuf + searchLen, blockSize);
 
-  for (int l = searchLen; bytesRead > 0; l = 0) { // adjust for first block
-    for (int i=0; i <= bytesRead - l; ++i) {
+  for (Size l = searchLen; bytesRead > 0; l = 0) { // adjust for first block
+    for (Size i=0; i <= bytesRead - l; ++i) {
       if (*searchFor == searchBuf[l + i]) {
         if (! memcmp(searchFor, searchBuf + l + i, searchLen)) {
           delete [] searchBuf;
@@ -779,7 +794,7 @@ bool FileDisplay::moveTo(const Byte* searchFor, int searchLen)
 //   true:   The search was successful
 //   false:  Search unsuccessful, file not moved
 
-bool FileDisplay::moveToBack(const Byte* searchFor, int searchLen)
+bool FileDisplay::moveToBack(const Byte* searchFor, size_t searchLen)
 {
   if (! fileName[0] || offset == 0)
     return true;
@@ -789,7 +804,7 @@ bool FileDisplay::moveToBack(const Byte* searchFor, int searchLen)
   memcpy(searchBuf + blockSize, data->buffer, searchLen);
 
   FPos newPos = offset - blockSize;
-  int diff = 0;
+  FPos diff = 0;
 
   for (;;) {
     if (newPos < 0) {
@@ -802,7 +817,7 @@ bool FileDisplay::moveToBack(const Byte* searchFor, int searchLen)
     if (diff)
       memmove(searchBuf + (blockSize + diff), searchBuf + blockSize, searchLen);
 
-    for (int i = blockSize - 1 + diff; i >= 0; --i) {
+    for (FPos i = blockSize - 1 + diff; i >= 0; --i) {
       if (*searchFor == searchBuf[i]) {
         if (! memcmp(searchFor, searchBuf + i, searchLen)) {
           delete [] searchBuf;
@@ -864,8 +879,7 @@ void FileDisplay::moveToEnd(FileDisplay* other)
 
 bool FileDisplay::setFile(const char* aFileName)
 {
-  strncpy(fileName, aFileName, maxPath);
-  fileName[maxPath-1] = '\0';
+  strncpy_s(fileName, sizeof(fileName), aFileName, _TRUNCATE);
 
   win.put(0,0, fileName);
   win.putAttribs(0,0, cFileName, screenWidth);
@@ -889,9 +903,9 @@ bool FileDisplay::setFile(const char* aFileName)
 //====================================================================
 // Main Program:
 //--------------------------------------------------------------------
-void calcScreenLayout(bool resize = true)
+void calcScreenLayout(/*bool resize = true*/)
 {
-  int  screenX, screenY;
+  short screenX, screenY;
 
   ConWindow::getScreenSize(screenX, screenY);
 
@@ -918,7 +932,7 @@ void calcScreenLayout(bool resize = true)
     numLines = (numLines - linesBetween) / 2;
   }
 
-  bufSize = numLines * lineWidth;
+  bufSize = static_cast<Size>(numLines) * static_cast<Size>(lineWidth);
 
   steps[cmmMovePage] = bufSize-lineWidth;
 
@@ -958,6 +972,7 @@ void displayLockState()
 //   status:   The exit status to use
 //   message:  The message to print
 
+[[ noreturn ]]
 void exitMsg(int status, const char* message)
 {
   ConWindow::shutdown();
@@ -978,7 +993,7 @@ void exitMsg(int status, const char* message)
 //   true:   The input buffer was changed
 //   false:  No changes were necessary
 
-bool InputManager::normalize(int pos)
+bool InputManager::normalize(size_t pos)
 {
   if (!splitHex) return false;
 
@@ -1009,7 +1024,7 @@ bool InputManager::normalize(int pos)
 //   restrict:  If not NULL, accept only chars in this string
 //   upcase:    If true, convert all chars with safeUC
 
-void getString(char* buf, int maxLen, StrVec& history,
+void getString(char* buf, size_t maxLen, StrVec& history,
                const char* restrict=NULL,
                bool upcase=false, bool splitHex=false)
 {
@@ -1030,7 +1045,7 @@ void getString(char* buf, int maxLen, StrVec& history,
 //   aMaxLen:   The maximum number of chars to accept (not including NUL byte)
 //   aHistory:  The history vector to use
 
-InputManager::InputManager(char* aBuf, int aMaxLen, StrVec& aHistory)
+InputManager::InputManager(char* aBuf, size_t aMaxLen, StrVec& aHistory)
 : buf(aBuf),
   restrict(NULL),
   history(aHistory),
@@ -1072,7 +1087,7 @@ bool InputManager::run()
     inWin.put(2,1,buf);
     if (inWinShown) inWin.update(1); // Only update inside the box
     else { inWin.update();   inWinShown = true; } // Show the input window
-    inWin.setCursor(2+i,1);
+    inWin.setCursor(2+static_cast<short>(i),1);
     int key = inWin.readKey();
     if (upcase) key = safeUC(key);
 
@@ -1209,7 +1224,7 @@ bool InputManager::run()
         } else { // overstrike mode
           if (i >= maxLen) continue;
         } // end else overstrike mode
-        buf[i++] = key;
+        buf[i++] = static_cast<char>(key);
         if (splitHex && (i < maxLen) && (i % 3 == 2))
           ++i;
         if (i > len) len = i;
@@ -1283,7 +1298,7 @@ void InputManager::useHistory(int delta)
 // Returns:
 //   The number of bytes in buf
 
-int packHex(Byte* buf)
+size_t packHex(Byte* buf)
 {
   unsigned long val;
 
@@ -1299,7 +1314,7 @@ int packHex(Byte* buf)
     }
   }
 
-  return out - buf;
+  return static_cast<size_t>(out - buf);
 } // end packHex
 
 //--------------------------------------------------------------------
@@ -1321,7 +1336,7 @@ void positionInWin(Command cmd, short width, const char* title)
               : numLines/2));                                // Moving top
 
   inWin.border();
-  inWin.put((width-strlen(title))/2,0, title);
+  inWin.put((width - static_cast<short>(strlen(title)))/2,0, title);
 } // end positionInWin
 
 //--------------------------------------------------------------------
@@ -1356,8 +1371,8 @@ void showPrompt()
   promptWin.border();
 
 #ifdef WIN32_CONSOLE
-  promptWin.put(1,1, "Arrow keys move  F find  N next  RET next difference  ESC quit  ALT  top");
-  promptWin.put(1,2, "C  ASCII/EBCDIC  E edit  P prev  G   goto position    Q   quit  CTRL bottom");
+  promptWin.put(1,1, "Arrow keys move  F find  N next  RET next difference  ESC quit  CTRL top");
+  promptWin.put(1,2, "C  ASCII/EBCDIC  E edit  P prev  G   goto position    Q   quit  ALT  bottom");
   const short
     topBotLength = 4,
     topLength    = 8;
@@ -1405,7 +1420,7 @@ bool initialize()
 
   ConWindow::hideCursor();
 
-  calcScreenLayout(false);
+  calcScreenLayout(/*false*/);
 
   inWin.init(0,0, inWidth+2,3, cPromptBdr);
   inWin.border();
@@ -1413,7 +1428,7 @@ bool initialize()
   inWin.setAttribs(cPromptWin);
   inWin.hide();
 
-  int y;
+  short y;
   if (singleFile) y = numLines + 1;
   else            y = numLines * 2 + linesBetween + 2;
 
@@ -1438,7 +1453,7 @@ bool initialize()
 #ifdef WIN32_CONSOLE
 Command getCommand()
 {
-  KEY_EVENT_RECORD e;
+  KEY_EVENT_RECORD e = { 0 };
   Command  cmd = cmNothing;
 
   while (cmd == cmNothing) {
@@ -1661,7 +1676,7 @@ void searchFiles(Command cmd)
 
       const int maxLen = screenWidth-4;
       Byte buf[maxLen+1];
-      int searchLen;
+      size_t searchLen;
 
       if (hex) {
         getString(reinterpret_cast<char*>(buf), maxLen, hexSearchHistory, hexDigits, true, true);
@@ -1671,7 +1686,7 @@ void searchFiles(Command cmd)
 
         searchLen = strlen(reinterpret_cast<char*>(buf));
         if (displayTable == ebcdicDisplayTable) {
-          for (int i = 0; i < searchLen; ++i)
+          for (size_t i = 0; i < searchLen; ++i)
             buf[i] = ascii2ebcdicTable[buf[i]];
         } // end if in EBCDIC mode
       } // end else text search
@@ -1709,7 +1724,7 @@ void searchFiles(Command cmd)
 void handleCmd(Command cmd)
 {
   if (cmd & cmmMove) {
-    int  step = steps[cmd & cmmMoveSize];
+    FPos  step = steps[cmd & cmmMoveSize];
 
     if ((cmd & cmmMoveForward) == 0)
       step *= -1;               // We're moving backward
@@ -1776,8 +1791,8 @@ void handleCmd(Command cmd)
 
   // Make sure we haven't gone past the end of both files:
   while (diffs.compute() < 0) {
-    file1.move(-steps[cmmMovePage]);
-    file2.move(-steps[cmmMovePage]);
+    file1.move(-static_cast<FPos>(steps[cmmMovePage]));
+    file2.move(-static_cast<FPos>(steps[cmmMovePage]));
   }
 
   file1.display();
@@ -1789,6 +1804,7 @@ void handleCmd(Command cmd)
 //====================================================================
 // Display license information and exit:
 
+[[ noreturn ]]
 bool license(GetOpt*, const GetOpt::Option*, const char*,
              GetOpt::Connection, const char*, int*)
 {
@@ -1809,7 +1825,9 @@ bool license(GetOpt*, const GetOpt::Option*, const char*,
   );
 
   exit(0);
-  return false;                 // Never happens
+#if 0
+  return false;                 // Never happen
+#endif
 } // end license
 
 //--------------------------------------------------------------------
@@ -1819,6 +1837,7 @@ bool license(GetOpt*, const GetOpt::Option*, const char*,
 //   showHelp:    True means display usage information
 //   exitStatus:  Status code to pass to exit()
 
+[[ noreturn ]]
 void usage(bool showHelp, int exitStatus)
 {
   if (exitStatus > 1)
@@ -1840,11 +1859,14 @@ Options:\n\
   exit(exitStatus);
 } // end usage
 
-bool usage(GetOpt* getopt, const GetOpt::Option* option,
+[[ noreturn ]]
+bool usage(GetOpt*, const GetOpt::Option* option,
            const char*, GetOpt::Connection, const char*, int*)
 {
   usage(option->shortName == '?');
+#if 0
   return false;                 // Never happens
+#endif
 } // end usage
 
 //--------------------------------------------------------------------
@@ -1886,7 +1908,8 @@ void processOptions(int& argc, char**& argv)
 //====================================================================
 int main(int argc, char* argv[])
 {
-  if ((program_name = strrchr(argv[0], '\\')))
+  program_name = strrchr(argv[0], '\\');
+  if (program_name)
     // Isolate the filename:
     ++program_name;
   else

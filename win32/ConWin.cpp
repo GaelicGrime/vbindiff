@@ -116,7 +116,7 @@ void ConWindow::shutdown()
 //--------------------------------------------------------------------
 // Return the current screen size:
 
-void ConWindow::getScreenSize(int& x, int& y)
+void ConWindow::getScreenSize(short& x, short& y)
 {
   CONSOLE_SCREEN_BUFFER_INFO  info;
 
@@ -198,7 +198,7 @@ void ConWindow::showCursor(bool insert)
 
   if (GetConsoleCursorInfo(scrBuf, &info)) {
     info.bVisible = TRUE;
-    info.dwSize = (insert ? 10 : 100);
+    info.dwSize = (insert ? 10UL : 100UL);
     SetConsoleCursorInfo(scrBuf, &info);
   }
 } // end ConWindow::showCursor
@@ -387,7 +387,7 @@ void ConWindow::resize(short width, short height)
     size.Y = height;
 
     delete [] data;
-    data = new CHAR_INFO[size.X * size.Y];
+    data = new CHAR_INFO[static_cast<size_t>(size.X) * static_cast<size_t>(size.Y)];
   } // end if new size
 
   clear();
@@ -425,7 +425,7 @@ void ConWindow::setCursor(short x, short y)
 // Input:
 //   margin:  Exclude this many characters around the edge (default 0)
 
-void ConWindow::update(unsigned short margin)
+void ConWindow::update(short margin)
 {
   SMALL_RECT r;
   r.Left   = pos.X + margin;

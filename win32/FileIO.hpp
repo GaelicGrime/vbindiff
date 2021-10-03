@@ -25,7 +25,7 @@
 
 typedef HANDLE   File;
 typedef __int64  FPos;
-typedef int      Size;
+typedef DWORD    Size;
 
 const DWORD
   SeekEnd = FILE_END,
@@ -75,7 +75,7 @@ Size ReadFile(File file, void* buffer, Size count)
 {
   DWORD  bytesRead;
 
-  if (!ReadFile(file, buffer, count, &bytesRead, NULL)) return -1;
+  if (!ReadFile(file, buffer, count, &bytesRead, NULL)) return 0;
 
   return bytesRead;
 } // end ReadFile
@@ -87,7 +87,7 @@ FPos SeekFile(File file, FPos position, DWORD whence=SeekPos)
 
    li.QuadPart = position;
 
-   li.LowPart = SetFilePointer(file, li.LowPart, &li.HighPart, whence);
+   li.LowPart = SetFilePointer(file, static_cast<LONG>(li.LowPart), &li.HighPart, whence);
 
    if ((li.LowPart == INVALID_SET_FILE_POINTER) && (GetLastError() != NO_ERROR))
      li.QuadPart = -1;
@@ -98,7 +98,9 @@ FPos SeekFile(File file, FPos position, DWORD whence=SeekPos)
 //--------------------------------------------------------------------
 inline FPos ConvString(char* buffer)
 {
-  return _strtoui64(buffer, NULL, 16);
+  FPos ret = _strtoi64(buffer, NULL, 16);
+  if (ret < 0) ret = 0;
+  return ret;
 } // end ConvString
 
 #endif // INCLUDED_FILEIO_HPP
