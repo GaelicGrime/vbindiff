@@ -761,12 +761,12 @@ bool FileDisplay::moveTo(const Byte* searchFor, size_t searchLen)
 
   Size bytesRead = ReadFile(file, searchBuf + searchLen, blockSize);
 
-  for (Size l = searchLen; bytesRead > 0; l = 0) { // adjust for first block
-    for (Size i=0; i <= bytesRead - l; ++i) {
+  for (size_t l = searchLen; bytesRead > 0; l = 0) { // adjust for first block
+    for (size_t i=0; i <= bytesRead - l; ++i) {
       if (*searchFor == searchBuf[l + i]) {
         if (! memcmp(searchFor, searchBuf + l + i, searchLen)) {
           delete [] searchBuf;
-          moveTo(newPos + i - searchLen + l);
+          moveTo(newPos + static_cast<FPos>(i - searchLen + l));
           search = searchLen;
           return true;
         }
