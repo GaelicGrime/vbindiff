@@ -487,14 +487,21 @@ void FileDisplay::display()
 
     size_t bufHexLen = 0;
 
-    snprintf(bufHex + bufHexLen, bufHexSize - bufHexLen,
-             "%01X%04X %04X: ",
-             Word(lineOffset >> 32),
-             Word(lineOffset >> 16),
-             Word(lineOffset & 0xFFFF));
-    bufHexLen += strlen(bufHex + bufHexLen);
+    Size posEndOfRowInBuffer = static_cast<Size>(row) * static_cast<Size>(lineWidth);
+    if (posEndOfRowInBuffer > bufContents)
+      lineLength = 0;
+    else
+      lineLength = static_cast<short>(min(static_cast<Size>(lineWidth), bufContents - posEndOfRowInBuffer));
 
-    lineLength = static_cast<short>(min(static_cast<Size>(lineWidth), bufContents - static_cast<Size>(row) * static_cast<Size>(lineWidth)));
+    if (lineLength) {
+      snprintf(bufHex + bufHexLen, bufHexSize - bufHexLen,
+               "%01X%04X %04X: ",
+               Word(lineOffset >> 32),
+               Word(lineOffset >> 16),
+               Word(lineOffset & 0xFFFF));
+      bufHexLen += strlen(bufHex + bufHexLen);
+    }
+
 
     for (col=0, idx = -1; col < lineLength; ++col) {
       bool addSpace = false;
