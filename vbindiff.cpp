@@ -122,22 +122,25 @@ const Command  cmToggleASCII  = 12;
 
 const short  leftMar  = 13;     // Starting column of hex display
 
-#ifdef WIDTH24
 // display 3 x 8 Byte
-const short   lineWidth = 24;
-const short screenWidth = 114;
-const short    leftMar2 = 88;
-#elif WIDTH32
+const short   lineWidth_3 = 24;
+const short screenWidth_3 = 114;
+const short    leftMar2_3 = 88;
 // display 4 x 8 Byte
-const short   lineWidth = 32;
-const short screenWidth = 148;
-const short    leftMar2 = 113;
-#else
+const short   lineWidth_4 = 32;
+const short screenWidth_4 = 148;
+const short    leftMar2_4 = 113;
 // display 2 x 8 Byte
-const short   lineWidth = 16;    // Number of bytes displayed per line
-const short screenWidth = 80;    // Key value - but _must_ be constant!
-const short    leftMar2 = 63;    // Starting column of ASCII display
-#endif
+const short   lineWidth_2 = 16;    // Number of bytes displayed per line
+const short screenWidth_2 = 80;    // Key value - but _must_ be constant!
+const short    leftMar2_2 = 63;    // Starting column of ASCII display
+
+const short screenWidth_max = screenWidth_4;
+const short screenWidth_min = screenWidth_2;
+
+short   lineWidth =   lineWidth_4;
+short screenWidth = screenWidth_4;
+short    leftMar2 =    leftMar2_4;
 
 const short promptHeight = 4;    // Height of prompt window
 const short inWidth = 10;        // Width of input window (excluding border)
@@ -158,19 +161,13 @@ void showPrompt();
 
 class Difference;
 
-union FileBuffer
-{
-  Byte  line[1][lineWidth];
-  Byte  buffer[lineWidth];
-}; // end FileBuffer
-
 class FileDisplay
 {
   friend class Difference;
 
  protected:
   Size               bufContents;
-  FileBuffer*        data;
+  Byte*              data;
   const Difference*  diffs;
   File               file;
   char               fileName[maxPath];
@@ -187,7 +184,7 @@ class FileDisplay
   void         shutDown();
   void         display();
   bool         edit(const FileDisplay* other);
-  const Byte*  getBuffer() const { return data->buffer; };
+  const Byte*  getBuffer() const { return data; };
   void         move(FPos step)    { moveTo(offset + step); };
   void         moveTo(FPos newOffset);
   bool         moveTo(const Byte* searchFor, size_t searchLen);
@@ -204,7 +201,7 @@ class Difference
   friend void FileDisplay::display();
 
  protected:
-  FileBuffer*         data;
+  Byte*               data;
   const FileDisplay*  file1;
   const FileDisplay*  file2;
   int                 numDiffs;
@@ -264,7 +261,7 @@ short linesBetween = 1;    // Number of lines of padding between files
 
 // The number of bytes to move for each possible step size:
 //   See cmmMoveByte, cmmMoveLine, cmmMovePage
-Size  steps[4] = {1, lineWidth, bufSize-lineWidth, 0};
+Size  steps[4] = {1, static_cast<Size>(lineWidth), bufSize-lineWidth, 0};
 
 
 //====================================================================
@@ -340,19 +337,19 @@ int Difference::compute()
     // We return 1 so that cmNextDiff won't keep searching:
     return (file1->bufContents ? 1 : -1);
 
-  memset(data->buffer, 0, bufSize); // Clear the difference table
+  memset(data, 0, bufSize); // Clear the difference table
 
   int  different = 0;
 
-  const Byte*  buf1 = file1->data->buffer;
-  const Byte*  buf2 = file2->data->buffer;
+  const Byte*  buf1 = file1->data;
+  const Byte*  buf2 = file2->data;
 
   Size size = min(file1->bufContents, file2->bufContents);
 
   Size i;
   for (i = 0; i < size; i++)
     if (*(buf1++) != *(buf2++)) {
-      data->buffer[i] = true;
+      data[i] = true;
       ++different;
     }
 
@@ -362,7 +359,7 @@ int Difference::compute()
     // One buffer has more data than the other:
     different += size - i;
     for (; i < size; i++)
-      data->buffer[i] = true;   // These bytes are only in 1 buffer
+      data[i] = true;           // These bytes are only in 1 buffer
   } else if (!size)
     return -1;                  // Both buffers are empty
 
@@ -377,9 +374,9 @@ void Difference::resize()
   if (singleFile) return;
 
   if (data)
-    delete [] reinterpret_cast<Byte*>(data);
+    delete [] data;
 
-  data = reinterpret_cast<FileBuffer*>(new Byte[bufSize]);
+  data = new Byte[bufSize];
 } // end Difference::resize
 
 //====================================================================
@@ -453,9 +450,9 @@ FileDisplay::~FileDisplay()
 void FileDisplay::resize()
 {
   if (data)
-    delete [] reinterpret_cast<Byte*>(data);
+    delete [] data;
 
-  data = reinterpret_cast<FileBuffer*>(new Byte[bufSize]);
+  data = new Byte[bufSize];
 
   // FIXME resize window
 } // end FileDisplay::resize
@@ -479,15 +476,18 @@ void FileDisplay::display()
 
   short row, col, idx, lineLength;
   FPos lineOffset = offset;
-  char bufHex[screenWidth + 1] = { 0 };
-  char bufAsc[lineWidth + lineWidth / 8] = { 0 };
+  char bufHex[1024] = { 0 };
+  char bufAsc[1024] = { 0 };
+
+  const size_t bufHexSize = static_cast<size_t>(screenWidth + 1);
+  const size_t bufAscSize = static_cast<size_t>(lineWidth + lineWidth / 8);
 
   for (row=0; row < numLines; ++row) {
-    memset(bufAsc, ' ', sizeof(bufAsc) - 1);
+    memset(bufAsc, ' ', bufAscSize - 1);
 
     size_t bufHexLen = 0;
 
-    snprintf(bufHex + bufHexLen, sizeof(bufHex) - bufHexLen,
+    snprintf(bufHex + bufHexLen, bufHexSize - bufHexLen,
              "%01X%04X %04X: ",
              Word(lineOffset >> 32),
              Word(lineOffset >> 16),
@@ -500,23 +500,23 @@ void FileDisplay::display()
       bool addSpace = false;
       if (! (col % 8)) { addSpace = true; ++idx; }
 
-      snprintf(bufHex + bufHexLen, sizeof(bufHex) - bufHexLen,
+      snprintf(bufHex + bufHexLen, bufHexSize - bufHexLen,
                "%s%02X ",
                addSpace ? " ": "",
-               data->line[row][col]);
+               data[row * lineWidth + col]);
       bufHexLen += strlen(bufHex + bufHexLen);
 
-      bufAsc[idx++] = displayTable[data->line[row][col]];
+      bufAsc[idx++] = displayTable[data[row * lineWidth + col]];
     }
-    memset(bufHex + bufHexLen, ' ', sizeof(bufHex) - bufHexLen);
-    bufHex[sizeof(bufHex) - 1] = 0;
+    memset(bufHex + bufHexLen, ' ', bufHexSize - bufHexLen);
+    bufHex[bufHexSize - 1] = 0;
 
     win.put(0,        row + 1, bufHex);
     win.put(leftMar2, row + 1, bufAsc);
 
     if (diffs)
       for (col=0; col < lineWidth; ++col)
-        if (diffs->data->line[row][col]) {
+        if (diffs->data[row * lineWidth + col]) {
           win.putAttribs(leftMar  + col * 3 + (col / 8), row + 1, cFileDiff, 2);
           win.putAttribs(leftMar2 + col     + (col / 8), row + 1, cFileDiff, 1);
         }
@@ -553,7 +553,7 @@ bool FileDisplay::edit(const FileDisplay* other)
   }
 
   if (bufContents < bufSize)
-    memset(data->buffer + bufContents, 0, bufSize - bufContents);
+    memset(data + bufContents, 0, bufSize - bufContents);
 
   short x = 0;
   short y = 0;
@@ -600,7 +600,7 @@ bool FileDisplay::edit(const FileDisplay* other)
        int newByte = -1;
        if ((key == KEY_RETURN) && other &&
            (other->bufContents > static_cast<Size>(x) + static_cast<Size>(y) * static_cast<Size>(lineWidth))) {
-         newByte = other->data->line[y][x]; // Copy from other file
+         newByte = other->data[y * lineWidth + x]; // Copy from other file
          hiNib = ascii; // Always advance cursor to next byte
        } else if (ascii) {
          if (isprint(key)) newByte = (inputTable ? inputTable[key] : key);
@@ -611,9 +611,9 @@ bool FileDisplay::edit(const FileDisplay* other)
            newByte = safeUC(key) - 'A' + 10;
          if (newByte >= 0) {
            if (hiNib)
-             newByte = (newByte * 0x10) | (0x0F & data->line[y][x]);
+             newByte = (newByte * 0x10) | (0x0F & data[y * lineWidth + x]);
            else
-             newByte |= 0xF0 & data->line[y][x];
+             newByte |= 0xF0 & data[y * lineWidth + x];
          } // end if valid digit entered
        } // end else hex
        if (newByte >= 0) {
@@ -651,7 +651,7 @@ bool FileDisplay::edit(const FileDisplay* other)
       moveTo(offset);           // Re-read buffer contents
     } else {
       SeekFile(file, offset);
-      WriteFile(file, data->buffer, bufContents);
+      WriteFile(file, data, bufContents);
     }
   }
   showPrompt();
@@ -678,11 +678,11 @@ void FileDisplay::setByte(short x, short y, Byte b)
     } // end if more than 1 byte past the end
    done:
     ++bufContents;
-    data->line[y][x] = static_cast<Byte>(b ^ 1);         // Make sure it's different
+    data[y * lineWidth + x] = static_cast<Byte>(b ^ 1);         // Make sure it's different
   } // end if past the end
 
-  if (data->line[y][x] != b) {
-    data->line[y][x] = b;
+  if (data[y * lineWidth + x] != b) {
+    data[y * lineWidth + x] = b;
     char str[3];
     snprintf(str, sizeof(str), "%02X", b);
     win.setAttribs(cFileEdit);
@@ -731,7 +731,7 @@ void FileDisplay::moveTo(FPos newOffset)
     offset = filesize;
 
   SeekFile(file, offset);
-  bufContents = ReadFile(file, data->buffer, bufSize);
+  bufContents = ReadFile(file, data, bufSize);
 } // end FileDisplay::moveTo
 
 //--------------------------------------------------------------------
@@ -801,7 +801,7 @@ bool FileDisplay::moveToBack(const Byte* searchFor, size_t searchLen)
 
   const int blockSize = 8 * 1024 * 1024;
   Byte *const searchBuf = new Byte[blockSize + searchLen];
-  memcpy(searchBuf + blockSize, data->buffer, searchLen);
+  memcpy(searchBuf + blockSize, data, searchLen);
 
   FPos newPos = offset - blockSize;
   FPos diff = 0;
@@ -895,7 +895,7 @@ bool FileDisplay::setFile(const char* aFileName)
   filesize = SeekFile(file, 0, SeekEnd);
   SeekFile(file, 0);
   offset = 0;
-  bufContents = ReadFile(file, data->buffer, bufSize);
+  bufContents = ReadFile(file, data, bufSize);
 
   return true;
 } // end FileDisplay::setFile
@@ -909,11 +909,25 @@ void calcScreenLayout(/*bool resize = true*/)
 
   ConWindow::getScreenSize(screenX, screenY);
 
-  if (screenX < screenWidth) {
+  if (screenX < screenWidth_min) {
     ostringstream  err;
     err << "The screen must be at least "
-        << screenWidth << " characters wide.";
+      << screenWidth_min << " characters wide.";
     exitMsg(2, err.str().c_str());
+  }
+
+  if (screenX >= screenWidth_4) {
+      lineWidth = lineWidth_4;
+    screenWidth = screenWidth_4;
+       leftMar2 = leftMar2_4;
+  } else if (screenX >= screenWidth_3) {
+      lineWidth = lineWidth_3;
+    screenWidth = screenWidth_3;
+       leftMar2 = leftMar2_3;
+  } else {
+      lineWidth = lineWidth_2;
+    screenWidth = screenWidth_2;
+       leftMar2 = leftMar2_2;
   }
 
   if (screenY < promptHeight + 4) {
@@ -1674,8 +1688,8 @@ void searchFiles(Command cmd)
     } else {
       positionInWin(cmd, screenWidth, (hex ? " Find Hex Bytes" : " Find Text "));
 
-      const int maxLen = screenWidth-4;
-      Byte buf[maxLen+1];
+      const size_t maxLen = static_cast<size_t>(screenWidth)-4;
+      Byte buf[screenWidth_max - 4 + 1];
       size_t searchLen;
 
       if (hex) {
