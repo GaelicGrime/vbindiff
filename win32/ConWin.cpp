@@ -31,6 +31,7 @@ void exitMsg(int status, const char* message); // From vbindiff.cpp
 
 #define F_BLACK 0
 #define F_RED   FOREGROUND_RED
+#define F_GREEN FOREGROUND_GREEN
 #define F_WHITE (FOREGROUND_RED|FOREGROUND_GREEN|FOREGROUND_BLUE)
 #define F_YELLOW (FOREGROUND_GREEN|FOREGROUND_RED)
 #define B_BLUE  BACKGROUND_BLUE
@@ -44,8 +45,9 @@ static const WORD colorStyle[] = {
   F_BLACK|B_WHITE,                      // cCurrentMode
   F_BLACK|B_WHITE,                      // cFileName
   F_WHITE|B_BLUE,                       // cFileWin
-  F_RED|B_BLUE|FOREGROUND_INTENSITY,    // cFileDiff
-  F_YELLOW|B_BLUE|FOREGROUND_INTENSITY  // cFileEdit
+  F_GREEN|B_BLUE|FOREGROUND_INTENSITY,  // cFileDiff
+  F_YELLOW|B_BLUE|FOREGROUND_INTENSITY, // cFileEdit
+  F_RED|B_WHITE,                        // cFileSearch
 };
 
 //====================================================================
