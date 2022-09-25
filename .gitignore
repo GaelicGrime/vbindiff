@@ -4,6 +4,7 @@
 *.obj
 *.pdb
 *.plg
+*.bak
 .deps
 Makefile
 Makefile.in
