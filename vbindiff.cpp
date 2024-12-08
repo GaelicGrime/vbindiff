@@ -886,6 +886,7 @@ void FileDisplay::moveToEnd(FileDisplay* other)
 
 bool FileDisplay::setFile(const char* aFileName)
 {
+  //strncpy_s(fileName, sizeof(fileName), aFileName, _TRUNCATE);
   strncpy(fileName, sizeof(fileName), aFileName, _TRUNCATE);
 
   win.put(0,0, fileName);
